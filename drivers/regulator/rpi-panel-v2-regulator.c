@@ -117,8 +117,7 @@ static int rpi_panel_v2_i2c_read(struct i2c_client *client, u8 reg,
 	return 0;
 }
 
-static int rpi_panel_v2_i2c_probe(struct i2c_client *i2c,
-				  const struct i2c_device_id *id)
+static int rpi_panel_v2_i2c_probe(struct i2c_client *i2c)
 {
 	struct backlight_properties props = { };
 	struct backlight_device *bl;
