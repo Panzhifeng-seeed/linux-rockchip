@@ -947,7 +947,7 @@ static int imx708_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct imx708 *imx708 = to_imx708(sd);
 	struct v4l2_mbus_framefmt *try_fmt_img =
-		v4l2_subdev_get_try_format(sd, fh->state, 0);
+		v4l2_subdev_state_get_format(fh->state, 0);
 
 	mutex_lock(&imx708->mutex);
 
@@ -1133,6 +1133,7 @@ static const struct v4l2_ctrl_ops imx708_ctrl_ops = {
 };
 
 static int imx708_g_frame_interval(struct v4l2_subdev *sd,
+				   struct v4l2_subdev_state *state,
 				   struct v4l2_subdev_frame_interval *fi)
 {
 	struct imx708 *imx708 = to_imx708(sd);
@@ -1190,7 +1191,7 @@ static int imx708_get_pad_format(struct v4l2_subdev *sd,
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
 #ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
-		fmt->format = *v4l2_subdev_get_try_format(sd, sd_state,
+		fmt->format = *v4l2_subdev_state_get_format(sd_state,
 						   fmt->pad);
 #else
 		mutex_unlock(&imx477->mutex);
@@ -1252,7 +1253,7 @@ static int imx708_set_pad_format(struct v4l2_subdev *sd,
 	fmt->format.field = V4L2_FIELD_NONE;
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
 #ifdef CONFIG_VIDEO_V4L2_SUBDEV_API
-		*v4l2_subdev_get_try_format(sd, sd_state, fmt->pad) = fmt->format;
+		*v4l2_subdev_state_get_format(sd_state, fmt->pad) = fmt->format;
 #else
 		mutex_unlock(&imx708->mutex);
 		return -ENOTTY;
@@ -1578,10 +1579,10 @@ static void imx708_get_module_inf(struct imx708 *imx708,
 				  struct rkmodule_inf *inf)
 {
 	memset(inf, 0, sizeof(*inf));
-	strlcpy(inf->base.sensor, IMX708_NAME, sizeof(inf->base.sensor));
-	strlcpy(inf->base.module, imx708->module_name,
+	strscpy(inf->base.sensor, IMX708_NAME, sizeof(inf->base.sensor));
+	strscpy(inf->base.module, imx708->module_name,
 		sizeof(inf->base.module));
-	strlcpy(inf->base.lens, imx708->len_name, sizeof(inf->base.lens));
+	strscpy(inf->base.lens, imx708->len_name, sizeof(inf->base.lens));
 
 	v4l2_dbg(1, debug, &imx708->subdev,"%s: get_module_inf:%s, %s, %s.\n", __func__,
 		inf->base.sensor, inf->base.module, inf->base.lens);
@@ -1772,7 +1773,6 @@ static const struct v4l2_subdev_core_ops imx708_core_ops = {
 
 static const struct v4l2_subdev_video_ops imx708_video_ops = {
 	.s_stream = imx708_set_stream,
-	.g_frame_interval = imx708_g_frame_interval,
 };
 
 static const struct v4l2_subdev_pad_ops imx708_pad_ops = {
@@ -1783,6 +1783,7 @@ static const struct v4l2_subdev_pad_ops imx708_pad_ops = {
 	.set_fmt = imx708_set_pad_format,
 	// .get_selection = imx708_get_selection,
 	.get_mbus_config = imx708_g_mbus_config,
+	.get_frame_interval = imx708_g_frame_interval,
 
 };
 
@@ -1964,8 +1965,7 @@ error_out:
 	return ret;
 }
 
-static int imx708_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int imx708_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
 	struct device_node *node = dev->of_node;
