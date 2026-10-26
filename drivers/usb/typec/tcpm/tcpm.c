@@ -7726,6 +7726,11 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	port->typec_caps.driver_data = port;
 	port->typec_caps.ops = &tcpm_ops;
 	port->typec_caps.orientation_aware = 1;
+	/* Propagate the connector fwnode into the port so
+	 * typec_port_register_altmodes() finds the DT "altmodes" node;
+	 * without it altmodes never bind and DP cannot be entered.
+	 */
+	port->typec_caps.fwnode = tcpc->fwnode;
 
 	port->partner_desc.identity = &port->partner_ident;
 
