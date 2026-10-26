@@ -7726,6 +7726,14 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	port->typec_caps.driver_data = port;
 	port->typec_caps.ops = &tcpm_ops;
 	port->typec_caps.orientation_aware = 1;
+	/*
+	 * Propagate the connector fwnode into the typec port: without it
+	 * typec_port_register_altmodes() cannot find the DT "altmodes" node,
+	 * the port-side altmode devices are never created and altmode drivers
+	 * fail their pin-assignment check (port->vdo == 0) with -ENODEV, so
+	 * DisplayPort (and any other) alternate mode can never be entered.
+	 */
+	port->typec_caps.fwnode = tcpc->fwnode;
 
 	port->partner_desc.identity = &port->partner_ident;
 
