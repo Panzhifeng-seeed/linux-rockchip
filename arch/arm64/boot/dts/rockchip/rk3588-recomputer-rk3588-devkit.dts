@@ -1217,7 +1217,26 @@
 &gpu {
 	mali-supply = <&vdd_gpu_s0>;
 	mem-supply = <&vdd_gpu_mem_s0>;
+	status = "disabled";
+};
+
+/* vendor-next ships no kbase/libmali userspace, so the GPU comes up through
+ * the mainline panthor KMD. Panthor fully activating with the dtsi's
+ * SCMI-assisted core clock wedges the SoC (BL31 v1.48 SCMI agent) - the
+ * same failure the RK3576 GPU bring-up hit on this firmware generation -
+ * so run the GPU on plain CRU clocks and let the OPP table drive them. */
+&gpu_panthor {
 	status = "okay";
+	mali-supply = <&vdd_gpu_s0>;
+	/delete-property/ assigned-clocks;
+	/delete-property/ assigned-clock-rates;
+	/delete-property/ clocks;
+	/delete-property/ clock-names;
+	clocks = <&cru CLK_GPU>, <&cru CLK_GPU_COREGROUP>,
+		 <&cru CLK_GPU_STACKS>;
+	clock-names = "core", "coregroup", "stacks";
+	assigned-clocks = <&cru CLK_GPU>;
+	assigned-clock-rates = <200000000>;
 };
 
 &rknpu {
