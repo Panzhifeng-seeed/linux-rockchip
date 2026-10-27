@@ -1135,6 +1135,13 @@ static int rk_udphy_dp_phy_init(struct phy *phy)
 
 	udphy->dp_in_use = true;
 
+	/* DP altmode negotiation usually completes before the DP controller
+	 * probes, and the HPD level reported then is dropped (dp_in_use not
+	 * set yet) leaving the display dark until replug - replay it here.
+	 */
+	if (udphy->dp_sink_hpd_sel)
+		rk_udphy_dp_hpd_event_trigger(udphy, udphy->dp_sink_hpd_cfg);
+
 	mutex_unlock(&udphy->mutex);
 
 	return 0;
