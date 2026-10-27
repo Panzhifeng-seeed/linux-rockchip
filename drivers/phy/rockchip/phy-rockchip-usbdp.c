@@ -1135,6 +1135,18 @@ static int rk_udphy_dp_phy_init(struct phy *phy)
 
 	udphy->dp_in_use = true;
 
+	/*
+	 * The type-c stack usually completes the DP alt mode negotiation
+	 * before the DP controller probes: the HPD level reported then was
+	 * dropped by rk_udphy_dp_hpd_event_trigger() because dp_in_use was
+	 * still false, and the altmode driver does not send it again - the
+	 * controller comes up with HPD low and the display stays dark until
+	 * the adapter is unplugged and replugged. Replay the recorded level
+	 * now that the DP phy is claimed.
+	 */
+	if (udphy->dp_sink_hpd_sel)
+		rk_udphy_dp_hpd_event_trigger(udphy, udphy->dp_sink_hpd_cfg);
+
 	mutex_unlock(&udphy->mutex);
 
 	return 0;
