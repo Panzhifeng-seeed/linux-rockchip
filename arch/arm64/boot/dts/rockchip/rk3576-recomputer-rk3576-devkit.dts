@@ -851,7 +851,7 @@
 
 				altmode@0 {
 					reg = <0>;
-					svid = <0xff01>;
+					svid = /bits/ 16 <0xff01>;
 					vdo = <0xffffffff>;
 				};
 			};
@@ -922,7 +922,7 @@
 /* USB3 OTG0/DP1.4 Alt */
 &usbdp_phy {
 	orientation-switch;
-	svid = <0xff01>;
+	mode-switch;
 	sbu1-dc-gpios = <&gpio4 RK_PC4 GPIO_ACTIVE_HIGH>;
 	sbu2-dc-gpios = <&gpio4 RK_PC5 GPIO_ACTIVE_HIGH>;
 	status = "okay";
