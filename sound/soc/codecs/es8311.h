@@ -152,6 +152,8 @@
 #define ES8311_GPIO_ADC2DAC_SEL_SHIFT 7
 #define ES8311_GPIO_ADCDAT_SEL_SHIFT 4
 
+#define ES8311_I2C_REGFA			0xFA /* I2C_RETIME and INI_REG */
+
 /* Chip Info Registers */
 #define ES8311_CHIPID1 0xFD /* 0x83 */
 #define ES8311_CHIPID2 0xFE /* 0x11 */
