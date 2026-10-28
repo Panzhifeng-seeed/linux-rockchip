@@ -10,8 +10,10 @@
 #include "linux/array_size.h"
 #include "sound/pcm.h"
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 #include <sound/core.h>
 #include <sound/pcm_params.h>
@@ -33,6 +35,12 @@ struct es8311_priv {
 	bool provider;
 	unsigned int rates[ES8311_NUM_RATES];
 	struct snd_pcm_hw_constraint_list constraints;
+	/* DT volume defaults (dac-volume / adc-volume, 0xbf = 0 dB); the
+	 * chip reverts these registers to their power-on values on ADC/DAC
+	 * domain power transitions, so they are re-checked at BIAS_PREPARE.
+	 */
+	bool dt_dac_vol_set, dt_adc_vol_set;
+	unsigned int dt_dac_vol, dt_adc_vol;
 };
 
 static const DECLARE_TLV_DB_SCALE(es8311_adc_vol_tlv, -9550, 50, 0);
@@ -765,6 +773,45 @@ static int es8311_set_bias_level(struct snd_soc_component *component,
 	case SND_SOC_BIAS_ON:
 		break;
 	case SND_SOC_BIAS_PREPARE:
+		/* Re-assert the DT volume defaults if the chip reverted them
+		 * to their power-on values on a domain power transition
+		 * (observed: ADC volume back to 0x00 after probe). Values
+		 * changed by userspace are left alone.
+		 */
+		if (es8311->dt_dac_vol_set &&
+		    snd_soc_component_read(component, ES8311_DAC2) == 0x97)
+			snd_soc_component_write(component, ES8311_DAC2,
+						es8311->dt_dac_vol);
+		if (es8311->dt_adc_vol_set &&
+		    snd_soc_component_read(component, ES8311_ADC3) == 0x00)
+			snd_soc_component_write(component, ES8311_ADC3,
+						es8311->dt_adc_vol);
+		/* Keep the analog domain in normal operation and the ADC
+		 * clocks running during capture: the DAPM graph powers the
+		 * ADC module and the bias gens but leaves Analog power down
+		 * (SYS3 PDN_ANA=1, VMIDSEL stuck at startup) and the two ADC
+		 * clock bits clear, which digitizes a full-scale rail instead
+		 * of the microphone. The vendor driver kept REG01=0x3f and
+		 * REG0D=0x02 at all times.
+		 */
+		snd_soc_component_update_bits(component, ES8311_SYS3,
+					      1 << ES8311_SYS3_PDN_ANA_SHIFT |
+					      ES8311_SYS3_PDN_VMIDSEL_MASK,
+					      ES8311_SYS3_PDN_VMIDSEL_NORMAL_OPERATION);
+		snd_soc_component_update_bits(component, ES8311_CLKMGR1,
+					      (1 << ES8311_CLKMGR1_CLKADC_ON_SHIFT) |
+					      (1 << ES8311_CLKMGR1_ANACLKADC_ON_SHIFT),
+					      (1 << ES8311_CLKMGR1_CLKADC_ON_SHIFT) |
+					      (1 << ES8311_CLKMGR1_ANACLKADC_ON_SHIFT));
+		/* The ADC digital domain reverts to its power-on values on
+		 * a power transition: re-assert the HPF/bypass configuration
+		 * the same way as the analog domain above.
+		 */
+		snd_soc_component_update_bits(component, ES8311_ADC8,
+					      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+					      BIT(ES8311_ADC8_HPF_SHIFT),
+					      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+					      BIT(ES8311_ADC8_HPF_SHIFT));
 		break;
 	case SND_SOC_BIAS_STANDBY:
 		if (snd_soc_component_get_bias_level(component) == SND_SOC_BIAS_OFF) {
@@ -875,8 +922,20 @@ static int es8311_resume(struct snd_soc_component *component)
 static int es8311_component_probe(struct snd_soc_component *component)
 {
 	struct es8311_priv *es8311;
+	unsigned int pga_gain, vol;
 
 	es8311 = snd_soc_component_get_drvdata(component);
+
+	/* Register-level soft reset (the vendor driver asserts REG 0xfa,
+	 * settles for 20 ms and releases it before anything else). Until
+	 * 0xfa is released the DAC digital input path stays dead - observed
+	 * through the chip's dac2adc loopback with every other playback
+	 * register matching the working configuration; the mainline driver
+	 * never touches this register.
+	 */
+	snd_soc_component_write(component, ES8311_I2C_REGFA, 0x01);
+	msleep(20);
+	snd_soc_component_write(component, ES8311_I2C_REGFA, 0x00);
 
 	es8311->mclk = devm_clk_get_optional(component->dev, "mclk");
 	if (IS_ERR(es8311->mclk)) {
@@ -894,6 +953,52 @@ static int es8311_component_probe(struct snd_soc_component *component)
 	/* Set minimal power up time */
 	snd_soc_component_write(component, ES8311_SYS1, 0);
 	snd_soc_component_write(component, ES8311_SYS2, 0);
+
+	/* Enable the ADC high-pass filter and keep the EQ block bypassed.
+	 * The HPF removes the DC offset of the analog input; with it
+	 * disabled the offset is amplified by the PGA (headset microphones
+	 * commonly carry a large one) and the ADC digitizes a stuck
+	 * full-scale rail - every capture sample reads 0x8000. Routing the
+	 * stream through the unconfigured EQ block instead (bit 6 low)
+	 * produces the same full-scale output. The vendor driver always
+	 * wrote 0x6a here ("set adc hpf, ADC_EQ bypass").
+	 */
+	snd_soc_component_update_bits(component, ES8311_ADC8,
+				      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+				      BIT(ES8311_ADC8_HPF_SHIFT),
+				      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+				      BIT(ES8311_ADC8_HPF_SHIFT));
+
+	/* Select the differential analog input (Mic1p-Mic1n) by default, as
+	 * the vendor 6.1 driver does; the "Differential Mux" would
+	 * otherwise stay disabled at its reset value and the capture path
+	 * never powers up. The "Differential Source" control remains
+	 * available for userspace to change it at runtime.
+	 */
+	snd_soc_component_update_bits(component, ES8311_SYS10, 0x30, 0x10);
+	/* The optional adc-pga-gain DT property (0..10, 3 dB/step) that
+	 * the vendor driver honored as well.
+	 */
+	if (!device_property_read_u32(component->dev, "adc-pga-gain", &pga_gain) &&
+	    pga_gain <= ES8311_SYS10_PGAGAIN_MAX)
+		snd_soc_component_update_bits(component, ES8311_SYS10,
+					      0x0f, pga_gain);
+
+	/* Volume defaults from DT, as the vendor driver wrote them
+	 * (dac-volume / adc-volume, 0x00..0xff with 0xbf = 0 dB; the reset
+	 * defaults are -20 dB on the DAC and -95.5 dB on the ADC). */
+	if (!device_property_read_u32(component->dev, "dac-volume", &vol) &&
+	    vol <= ES8311_DAC2_VOLUME_MAX) {
+		es8311->dt_dac_vol_set = true;
+		es8311->dt_dac_vol = vol;
+		snd_soc_component_write(component, ES8311_DAC2, vol);
+	}
+	if (!device_property_read_u32(component->dev, "adc-volume", &vol) &&
+	    vol <= ES8311_ADC3_VOLUME_MAX) {
+		es8311->dt_adc_vol_set = true;
+		es8311->dt_adc_vol = vol;
+		snd_soc_component_write(component, ES8311_ADC3, vol);
+	}
 
 	return 0;
 }
