@@ -10,6 +10,7 @@
 #include "linux/array_size.h"
 #include "sound/pcm.h"
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
@@ -765,6 +766,32 @@ static int es8311_set_bias_level(struct snd_soc_component *component,
 	case SND_SOC_BIAS_ON:
 		break;
 	case SND_SOC_BIAS_PREPARE:
+		/* Keep the analog domain in normal operation and the ADC
+		 * clocks running during capture: the DAPM graph powers the
+		 * ADC module and the bias gens but leaves Analog power down
+		 * (SYS3 PDN_ANA=1, VMIDSEL stuck at startup) and the two ADC
+		 * clock bits clear, which digitizes a full-scale rail instead
+		 * of the microphone. The vendor driver kept REG01=0x3f and
+		 * REG0D=0x02 at all times.
+		 */
+		snd_soc_component_update_bits(component, ES8311_SYS3,
+					      1 << ES8311_SYS3_PDN_ANA_SHIFT |
+					      ES8311_SYS3_PDN_VMIDSEL_MASK,
+					      ES8311_SYS3_PDN_VMIDSEL_NORMAL_OPERATION);
+		snd_soc_component_update_bits(component, ES8311_CLKMGR1,
+					      (1 << ES8311_CLKMGR1_CLKADC_ON_SHIFT) |
+					      (1 << ES8311_CLKMGR1_ANACLKADC_ON_SHIFT),
+					      (1 << ES8311_CLKMGR1_CLKADC_ON_SHIFT) |
+					      (1 << ES8311_CLKMGR1_ANACLKADC_ON_SHIFT));
+		/* The ADC digital domain reverts to its power-on values on
+		 * a power transition: re-assert the HPF/bypass configuration
+		 * the same way as the analog domain above.
+		 */
+		snd_soc_component_update_bits(component, ES8311_ADC8,
+					      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+					      BIT(ES8311_ADC8_HPF_SHIFT),
+					      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+					      BIT(ES8311_ADC8_HPF_SHIFT));
 		break;
 	case SND_SOC_BIAS_STANDBY:
 		if (snd_soc_component_get_bias_level(component) == SND_SOC_BIAS_OFF) {
@@ -878,6 +905,17 @@ static int es8311_component_probe(struct snd_soc_component *component)
 
 	es8311 = snd_soc_component_get_drvdata(component);
 
+	/* Register-level soft reset (the vendor driver asserts REG 0xfa,
+	 * settles for 20 ms and releases it before anything else). Until
+	 * 0xfa is released the DAC digital input path stays dead - observed
+	 * through the chip's dac2adc loopback with every other playback
+	 * register matching the working configuration; the mainline driver
+	 * never touches this register.
+	 */
+	snd_soc_component_write(component, 0xfa, 0x01);
+	msleep(20);
+	snd_soc_component_write(component, 0xfa, 0x00);
+
 	es8311->mclk = devm_clk_get_optional(component->dev, "mclk");
 	if (IS_ERR(es8311->mclk)) {
 		dev_err(component->dev, "invalid mclk\n");
@@ -894,6 +932,21 @@ static int es8311_component_probe(struct snd_soc_component *component)
 	/* Set minimal power up time */
 	snd_soc_component_write(component, ES8311_SYS1, 0);
 	snd_soc_component_write(component, ES8311_SYS2, 0);
+
+	/* Enable the ADC high-pass filter and keep the EQ block bypassed.
+	 * The HPF removes the DC offset of the analog input; with it
+	 * disabled the offset is amplified by the PGA (headset microphones
+	 * commonly carry a large one) and the ADC digitizes a stuck
+	 * full-scale rail - every capture sample reads 0x8000. Routing the
+	 * stream through the unconfigured EQ block instead (bit 6 low)
+	 * produces the same full-scale output. The vendor driver always
+	 * wrote 0x6a here ("set adc hpf, ADC_EQ bypass").
+	 */
+	snd_soc_component_update_bits(component, ES8311_ADC8,
+				      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+				      BIT(ES8311_ADC8_HPF_SHIFT),
+				      BIT(ES8311_ADC8_EQBYPASS_SHIFT) |
+				      BIT(ES8311_ADC8_HPF_SHIFT));
 
 	return 0;
 }
