@@ -264,11 +264,11 @@
 		rockchip,cpu = <&sai1>;
 		rockchip,codec = <&es8311>;
         rockchip,audio-routing =
-            /* Playback path - Headphone from differential output */
-            "Headphone", "DIFFERENTIAL OUT",
+            /* Playback path - Headphone from codec differential output */
+            "Headphone", "OUT",
             /* Capture path - Analog microphone */
-            "AMIC", "Main Mic",
-            "AMIC", "Headset Mic";
+            "MIC1", "Main Mic",
+            "MIC1", "Headset Mic";
 		pinctrl-names = "default";
 		pinctrl-0 = <&hp_det &hp_con>;
 
