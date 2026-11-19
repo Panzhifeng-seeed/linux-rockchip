@@ -148,6 +148,8 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3576-can0-m2.dtbo \
 	rk3576-can1-m1.dtbo \
 	rk3576-can1-m2.dtbo \
+	rk3576-can1-m3.dtbo \
+	rk3576-display-hdmi-vp1-dp0-vp0-4k.dtbo \
 	rk3576-i2c0-m1.dtbo \
 	rk3576-i2c1-m0.dtbo \
 	rk3576-i2c2-m0.dtbo \
@@ -172,8 +174,10 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3576-pwm2-ch1-m2.dtbo \
 	rk3576-pwm2-ch2-m1.dtbo \
 	rk3576-pwm2-ch3-m1.dtbo \
+	rk3576-pwm2-ch6-m0.dtbo \
 	rk3576-pwm2-ch6-m2.dtbo \
 	rk3576-pwm2-ch7-m2.dtbo \
+	rk3576-raspi-7inch-touchscreen-i2c0-m1.dtbo \
 	rk3576-raspi-7inch-touchscreen-i2c6-m3.dtbo \
 	rk3576-spi1-m1-spidev.dtbo \
 	rk3576-spi3-m0-spidev.dtbo \
@@ -181,6 +185,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3576-uart2-m1.dtbo \
 	rk3576-uart2-m2.dtbo \
 	rk3576-uart3-m0.dtbo \
+	rk3576-uart3-m1.dtbo \
 	rk3576-uart6-m0.dtbo \
 	rk3576-uart6-m3.dtbo \
 	rk3576-uart7-m0.dtbo \
@@ -245,6 +250,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3588-pwm7-m0.dtbo \
 	rk3588-pwm7-m3.dtbo \
 	rk3588-pwm8-m0.dtbo \
+	rk3588-raspi-7inch-touchscreen-i2c4-m1.dtbo \
 	rk3588-spi0-m1-cs0-spidev.dtbo \
 	rk3588-spi0-m1-cs1-spidev.dtbo \
 	rk3588-spi0-m2-cs0-cs1-spidev.dtbo \
@@ -353,28 +359,14 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3568-uart9-m1.dtbo \
 	rk3568-w1-gpio3-a5.dtbo \
 	rk3568-w1-gpio3-d1.dtbo \
-	recomputer-rk3576-devkit-raspi-7inch-touchscreen.dtbo \
-	recomputer-rk3576-devkit-40pin-pwm2-ch6.dtbo \
-	recomputer-rk3576-devkit-40pin-can0.dtbo \
-	recomputer-rk3576-devkit-40pin-can1.dtbo \
-	recomputer-rk3576-devkit-40pin-i2c3.dtbo \
-	recomputer-rk3576-devkit-40pin-uart3.dtbo \
 	recomputer-rk3576-devkit-40pin-uart5.dtbo \
 	recomputer-rk3576-devkit-halow-wifi.dtbo \
 	recomputer-rk3576-devkit-cam0-rpi-v2.dtbo \
 	recomputer-rk3576-devkit-cam0-rpi-v3.dtbo \
 	recomputer-rk3576-devkit-cam1-rpi-v2.dtbo \
 	recomputer-rk3576-devkit-cam1-rpi-v3.dtbo \
-	recomputer-rk3576-devkit-dp-4k.dtbo \
-	recomputer-rk3588-devkit-40pin-i2c3.dtbo \
-	recomputer-rk3588-devkit-40pin-pwm0_m1.dtbo \
-	recomputer-rk3588-devkit-40pin-pwm14.dtbo \
-	recomputer-rk3588-devkit-40pin-pwm15IR_m3.dtbo \
-	recomputer-rk3588-devkit-40pin-pwm1_m1.dtbo \
-	recomputer-rk3588-devkit-40pin-uart4.dtbo \
 	recomputer-rk3588-devkit-cam0-rpi-v2.dtbo \
 	recomputer-rk3588-devkit-cam0-rpi-v3.dtbo \
 	recomputer-rk3588-devkit-cam1-rpi-v2.dtbo \
 	recomputer-rk3588-devkit-cam1-rpi-v3.dtbo \
-	recomputer-rk3588-devkit-halow-wifi.dtbo \
-	recomputer-rk3588-devkit-raspi-7inch-touchscreen.dtbo
+	recomputer-rk3588-devkit-halow-wifi.dtbo
